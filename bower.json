@@ -1,0 +1,15 @@
+{
+  "name": "woosh",
+  "version": "1.0.0",
+  "main": "src/woosh.js",
+  "ignore": [
+    ".idea/",
+    ".jshintrc",
+    ".gitattributes",
+    ".gitignore",
+    ".package.json",
+    "test",
+    "node_modules",
+    "**/*.txt"
+  ]
+}
