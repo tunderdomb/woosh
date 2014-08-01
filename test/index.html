@@ -3,36 +3,89 @@
 <head>
   <meta charset="UTF-8">
   <title></title>
-  <style>body {
-    text-align: center
-  }</style>
+  <style>
+    body {
+      text-align: center
+    }
+
+    #box {
+      position: relative;
+      background: #000000;
+      width: 100px;
+      height: 100px;
+      line-height: 100px;
+      font-size: 2em;
+      top: -100px;
+      left: 0;
+      color: #ffffff;
+    }
+    #box2 {
+      position: relative;
+      background: #000000;
+      width: 100px;
+      height: 100px;
+      left: 1000px;
+      top: 100px;
+    }
+  </style>
 </head>
 <body>
 <canvas id="viewport" width=1000 height=400></canvas>
-<script src="../dist/woosh.js"></script>
+<div id="box"></div>
+<div id="box2"></div>
+<script src="../woosh.min.js"></script>
 <script>
-  var canvas = document.getElementById("viewport"), ctx = canvas.getContext("2d");
+  var canvas = document.getElementById("viewport")
+    , ctx = canvas.getContext("2d")
+    , box = document.getElementById("box")
+    , box2 = document.getElementById("box2")
 
   var animation = woosh({
+    delay: 3000,
     duration: 2000,
-    loop: false,
+    loop: true,
     ease: [0.25, 0.1, 0.0, 1.0]
   })
-    .listen("start", function(  ){
+    .listen("start", function (){
       console.log("Hey ho, let's go!")
     })
-    .listen("stop", function(  ){
+    .listen("stop", function (){
       console.log("Halted!")
     })
-    .listen("end", function(  ){
+    .listen("end", function (){
       console.log("Done!")
     })
     .start(function moveRectangle( p ){ // p move from 0 to 1
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "hsl(" + Math.round(255 * p) + ",80%,50%)";
-      var w = 50;
-      var h = 50 + p * (canvas.height - 50);
-      ctx.fillRect((canvas.width - w) * p, (canvas.height - h) * 0.5, w, h);
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      ctx.fillStyle = "hsl(" + Math.round(255 * p) + ",80%,50%)"
+      var w = 50
+      var h = 50 + p * (canvas.height - 50)
+      ctx.fillRect((canvas.width - w) * p, (canvas.height - h) * 0.5, w, h)
+    })
+
+  var propertyAnimation = woosh({
+    duration: 2000,
+    loop: 10,
+    ease: [0.25, 0.1, 0.0, 1.0],
+    context: box
+  })
+    .to(box, {
+      left: "500px",
+      top: "100px"
+    })
+    .listen("cycle", function( cycleCount ){
+      this.textContent = 10-cycleCount
+    })
+
+  var propertyAnimation2 = woosh({
+    duration: 2000,
+    loop: true,
+    ease: [0.25, 0.1, 0.0, 1.0],
+    context: box2
+  })
+    .to(box2, {
+      left: 0,
+      top: -100
     })
 
 </script>
