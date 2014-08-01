@@ -32,7 +32,15 @@ Animation.prototype = {
     this.duration = tween.duration || this.duration
     this.delay = tween.delay || this.delay
     if ( tween.loop != undefined ) this.loop = tween.loop
-    if ( tween.ease ) this.ease.apply(this, tween.ease)
+    if ( tween.ease ) {
+      if ( EASINGS[tween.ease] ) {
+        this.easing = EASINGS[tween.ease]
+      }
+      else if ( typeof tween.ease == "function" ) {
+        this.easing = tween.ease
+      }
+      else this.ease.apply(this, tween.ease)
+    }
     this.context = tween.context || null
     return this
   },

@@ -14,11 +14,15 @@ module.exports = function ( woosh ){
   }
 
   function getValue( subject, property ){
-    var value = parseInt(subject instanceof Element
-      ? getStyle(subject, property)
-      : subject[property])
+    var value
+    if( property in subject ){
+      value = parseInt(subject[property])
+    }
+    else if ( subject instanceof Element ) {
+      value = parseInt(getStyle(subject, property))
+    }
     // assume 0 for unset or non-numeric values
-    return isNaN(value) ? 0 : value
+    return isNaN(value) || value == undefined ? 0 : value
   }
 
   function setValue( subject, property, val, post ){

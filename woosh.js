@@ -177,7 +177,15 @@ Animation.prototype = {
     this.duration = tween.duration || this.duration
     this.delay = tween.delay || this.delay
     if ( tween.loop != undefined ) this.loop = tween.loop
-    if ( tween.ease ) this.ease.apply(this, tween.ease)
+    if ( tween.ease ) {
+      if ( EASINGS[tween.ease] ) {
+        this.easing = EASINGS[tween.ease]
+      }
+      else if ( typeof tween.ease == "function" ) {
+        this.easing = tween.ease
+      }
+      else this.ease.apply(this, tween.ease)
+    }
     this.context = tween.context || null
     return this
   },
@@ -400,11 +408,15 @@ module.exports = function ( woosh ){
   }
 
   function getValue( subject, property ){
-    var value = parseInt(subject instanceof Element
-      ? getStyle(subject, property)
-      : subject[property])
+    var value
+    if( property in subject ){
+      value = parseInt(subject[property])
+    }
+    else if ( subject instanceof Element ) {
+      value = parseInt(getStyle(subject, property))
+    }
     // assume 0 for unset or non-numeric values
-    return isNaN(value) ? 0 : value
+    return isNaN(value) || value == undefined ? 0 : value
   }
 
   function setValue( subject, property, val, post ){
