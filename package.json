@@ -2,7 +2,7 @@
   "name": "woosh",
   "version": "0.3.2",
   "description": "Tiny tweening",
-  "main": "index.js",
+  "main": "woosh.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/tunderdomb/woosh.git"
