@@ -1,8 +1,8 @@
 {
-  "name": "woosh",
-  "version": "0.3.3",
-  "description": "Tiny tweening",
-  "main": "woosh.js",
+  "name": "woosh-tween",
+  "version": "0.4.0",
+  "description": "Tiny tweening library with bezier easings",
+  "main": "src/index.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/tunderdomb/woosh.git"
@@ -14,7 +14,7 @@
   },
   "homepage": "https://github.com/tunderdomb/woosh",
   "dependencies": {
-    "bezier-easing": "^0.4.0"
+    "bezier-easing": "^1.0.0"
   },
   "devDependencies": {
     "gulp-uglifyjs": "^0.4.2",

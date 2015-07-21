@@ -48,18 +48,14 @@ module.exports = function ( woosh ){
   function increment( animation, subject, property, max, post ){
     var startValue = getValue(subject, property)
       , delta = max - startValue
-    return function ( p ){
+
+    return function render( p ){
       var value = getValue(subject, property)
       if ( value <= max ) {
-//        console.log("startValue %d, max %d, delta %d, p %f, p*delta %f", startValue, max, delta, p, p*delta)
         p = startValue + (p *= delta) >= max ? max : startValue + p
-//        setValue(subject, property, p, post)
-//        return true
         return [subject, property, p, post]
       }
       else if ( animation.loop ) {
-//        setValue(subject, property, startValue, post)
-//        return true
         return [subject, property, startValue, post]
       }
       return false
@@ -69,18 +65,14 @@ module.exports = function ( woosh ){
   function decrement( animation, subject, property, min, post ){
     var startValue = getValue(subject, property)
       , delta = startValue - min
-    return function ( p ){
+    return function render( p ){
       var value = getValue(subject, property)
       if ( value >= min ) {
         p = startValue - delta * p
         p = p <= min ? min : p
-//        setValue(subject, property, p, post)
-//        return true
         return [subject, property, p, post]
       }
       else if ( animation.loop ) {
-//        setValue(subject, property, startValue, post)
-//        return true
         return [subject, property, startValue, post]
       }
       return false
@@ -93,17 +85,25 @@ module.exports = function ( woosh ){
       , valFrom
       , valTo
       , post
+
     for ( var p in to ) {
-      valFrom = getValue(subject, p)
-      valTo = getValue(to, p)
-      post = postfix(subject, p) || postfix(to, p)
-      ++length
-      if ( valFrom < valTo ) values[p] = increment(animation, subject, p, valTo, post)
-      else if ( valFrom > valTo ) values[p] = decrement(animation, subject, p, valTo, post)
-      else --length
+      if (to.hasOwnProperty(p)) {
+        valFrom = getValue(subject, p)
+        valTo = getValue(to, p)
+        post = postfix(subject, p) || postfix(to, p)
+        ++length
+        if ( valFrom < valTo )
+          values[p] = increment(animation, subject, p, valTo, post)
+        else if ( valFrom > valTo )
+          values[p] = decrement(animation, subject, p, valTo, post)
+        else
+          --length
+      }
     }
+
     to = subject = null
-    return function ( p ){
+
+    return function render( p ){
       if ( length ) {
         var setters = []
           , setter

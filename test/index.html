@@ -27,21 +27,30 @@
       left: 1000px;
       top: 100px;
     }
+    #box3 {
+      position: absolute;
+      background: #000000;
+      width: 100px;
+      height: 100px;
+      right: 0;
+      top: 0;
+    }
   </style>
 </head>
 <body>
 <canvas id="viewport" width=1000 height=400></canvas>
 <div id="box"></div>
 <div id="box2"></div>
-<script src="../woosh.min.js"></script>
+<div id="box3"></div>
+<script src="../woosh.js"></script>
 <script>
   var canvas = document.getElementById("viewport")
     , ctx = canvas.getContext("2d")
     , box = document.getElementById("box")
     , box2 = document.getElementById("box2")
+    , box3 = document.getElementById("box3")
 
   var animation = woosh({
-    delay: 3000,
     duration: 2000,
     loop: true,
     ease: [0.25, 0.1, 0.0, 1.0]
@@ -64,8 +73,8 @@
     })
 
   var propertyAnimation = woosh({
-    duration: 2000,
-    loop: 10,
+    duration: 1000,
+    loop: 3,
     ease: [0.25, 0.1, 0.0, 1.0],
     context: box
   })
@@ -73,8 +82,11 @@
       left: "500px",
       top: "100px"
     })
+    .listen("end", function (){
+      console.log("Ok Done!")
+    })
     .listen("cycle", function( cycleCount ){
-      this.textContent = 10-cycleCount
+      this.textContent = 3-cycleCount
     })
 
   var propertyAnimation2 = woosh({
@@ -88,6 +100,37 @@
       top: -100
     })
 
+  var propertyAnimation3 = woosh({
+    delay: 3000,
+    duration: 5000,
+    loop: false,
+    ease: [0.25, 0.1, 0.0, 1.0],
+    context: box3
+  })
+    .listen("end", function (){
+      console.log("Ok Done!")
+    })
+    .to(box3, {
+      opacity: 0,
+      right: 500,
+      top: 500
+    })
+
+  window.addEventListener("keyup", function (e) {
+    switch (e.keyCode) {
+      case 27:
+        animation.end()
+        break
+      case 32:
+        if (animation.isRunning) {
+          animation.stop()
+        }
+        else {
+          animation.start()
+        }
+        break
+    }
+  }, false)
 </script>
 </body>
 </html>

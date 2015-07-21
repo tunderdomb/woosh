@@ -1,147 +1,184 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+(function (global){
 /**
  * BezierEasing - use bezier curve for transition easing function
- * is based on Firefox's nsSMILKeySpline.cpp
+ * by Gaëtan Renaudeau 2014 - 2015 – MIT License
+ *
+ * Credits: is based on Firefox's nsSMILKeySpline.cpp
  * Usage:
- * var spline = BezierEasing(0.25, 0.1, 0.25, 1.0)
- * spline(x) => returns the easing value | x must be in [0, 1] range
+ * var spline = BezierEasing([ 0.25, 0.1, 0.25, 1.0 ])
+ * spline.get(x) => returns the easing value | x must be in [0, 1] range
  *
  */
-(function (definition) {
-  if (typeof exports === "object") {
-    module.exports = definition();
+
+// These values are established by empiricism with tests (tradeoff: performance VS precision)
+var NEWTON_ITERATIONS = 4;
+var NEWTON_MIN_SLOPE = 0.001;
+var SUBDIVISION_PRECISION = 0.0000001;
+var SUBDIVISION_MAX_ITERATIONS = 10;
+
+var kSplineTableSize = 11;
+var kSampleStepSize = 1.0 / (kSplineTableSize - 1.0);
+
+var float32ArraySupported = 'Float32Array' in global;
+
+function A (aA1, aA2) { return 1.0 - 3.0 * aA2 + 3.0 * aA1; }
+function B (aA1, aA2) { return 3.0 * aA2 - 6.0 * aA1; }
+function C (aA1)      { return 3.0 * aA1; }
+
+// Returns x(t) given t, x1, and x2, or y(t) given t, y1, and y2.
+function calcBezier (aT, aA1, aA2) {
+  return ((A(aA1, aA2)*aT + B(aA1, aA2))*aT + C(aA1))*aT;
+}
+
+// Returns dx/dt given t, x1, and x2, or dy/dt given t, y1, and y2.
+function getSlope (aT, aA1, aA2) {
+  return 3.0 * A(aA1, aA2)*aT*aT + 2.0 * B(aA1, aA2) * aT + C(aA1);
+}
+
+function binarySubdivide (aX, aA, aB, mX1, mX2) {
+  var currentX, currentT, i = 0;
+  do {
+    currentT = aA + (aB - aA) / 2.0;
+    currentX = calcBezier(currentT, mX1, mX2) - aX;
+    if (currentX > 0.0) {
+      aB = currentT;
+    } else {
+      aA = currentT;
+    }
+  } while (Math.abs(currentX) > SUBDIVISION_PRECISION && ++i < SUBDIVISION_MAX_ITERATIONS);
+  return currentT;
+}
+
+function newtonRaphsonIterate (aX, aGuessT, mX1, mX2) {
+  for (var i = 0; i < NEWTON_ITERATIONS; ++i) {
+    var currentSlope = getSlope(aGuessT, mX1, mX2);
+    if (currentSlope === 0.0) return aGuessT;
+    var currentX = calcBezier(aGuessT, mX1, mX2) - aX;
+    aGuessT -= currentX / currentSlope;
   }
-  else if (typeof window.define === 'function' && window.define.amd) {
-    window.define([], definition);
-  } else {
-    window.BezierEasing = definition();
+  return aGuessT;
+}
+
+/**
+ * points is an array of [ mX1, mY1, mX2, mY2 ]
+ */
+function BezierEasing (points, b, c, d) {
+  if (arguments.length === 4) {
+    return new BezierEasing([ points, b, c, d ]);
   }
-}(function () {
+  if (!(this instanceof BezierEasing)) return new BezierEasing(points);
 
-  // These values are established by empiricism with tests (tradeoff: performance VS precision)
-  var NEWTON_ITERATIONS = 4;
-  var NEWTON_MIN_SLOPE = 0.001;
-  var SUBDIVISION_PRECISION = 0.0000001;
-  var SUBDIVISION_MAX_ITERATIONS = 10;
-
-  var kSplineTableSize = 11;
-  var kSampleStepSize = 1.0 / (kSplineTableSize - 1.0);
-
-  var float32ArraySupported = typeof Float32Array === "function";
-
-  function BezierEasing (mX1, mY1, mX2, mY2) {
-    // Validate arguments
-    if (arguments.length !== 4) {
-      throw new Error("BezierEasing requires 4 arguments.");
+  if (!points || points.length !== 4) {
+    throw new Error("BezierEasing: points must contains 4 values");
+  }
+  for (var i=0; i<4; ++i) {
+    if (typeof points[i] !== "number" || isNaN(points[i]) || !isFinite(points[i])) {
+      throw new Error("BezierEasing: points should be integers.");
     }
-    for (var i=0; i<4; ++i) {
-      if (typeof arguments[i] !== "number" || isNaN(arguments[i]) || !isFinite(arguments[i])) {
-        throw new Error("BezierEasing arguments should be integers.");
-      } 
-    }
-    if (mX1 < 0 || mX1 > 1 || mX2 < 0 || mX2 > 1) {
-      throw new Error("BezierEasing x values must be in [0, 1] range.");
-    }
-
-    var mSampleValues = float32ArraySupported ? new Float32Array(kSplineTableSize) : new Array(kSplineTableSize);
-   
-    function A (aA1, aA2) { return 1.0 - 3.0 * aA2 + 3.0 * aA1; }
-    function B (aA1, aA2) { return 3.0 * aA2 - 6.0 * aA1; }
-    function C (aA1)      { return 3.0 * aA1; }
-   
-    // Returns x(t) given t, x1, and x2, or y(t) given t, y1, and y2.
-    function calcBezier (aT, aA1, aA2) {
-      return ((A(aA1, aA2)*aT + B(aA1, aA2))*aT + C(aA1))*aT;
-    }
-   
-    // Returns dx/dt given t, x1, and x2, or dy/dt given t, y1, and y2.
-    function getSlope (aT, aA1, aA2) {
-      return 3.0 * A(aA1, aA2)*aT*aT + 2.0 * B(aA1, aA2) * aT + C(aA1);
-    }
-
-    function newtonRaphsonIterate (aX, aGuessT) {
-      for (var i = 0; i < NEWTON_ITERATIONS; ++i) {
-        var currentSlope = getSlope(aGuessT, mX1, mX2);
-        if (currentSlope === 0.0) return aGuessT;
-        var currentX = calcBezier(aGuessT, mX1, mX2) - aX;
-        aGuessT -= currentX / currentSlope;
-      }
-      return aGuessT;
-    }
-
-    function calcSampleValues () {
-      for (var i = 0; i < kSplineTableSize; ++i) {
-        mSampleValues[i] = calcBezier(i * kSampleStepSize, mX1, mX2);
-      }
-    }
-
-    function binarySubdivide (aX, aA, aB) {
-      var currentX, currentT, i = 0;
-      do {
-        currentT = aA + (aB - aA) / 2.0;
-        currentX = calcBezier(currentT, mX1, mX2) - aX;
-        if (currentX > 0.0) {
-          aB = currentT;
-        } else {
-          aA = currentT;
-        }
-      } while (Math.abs(currentX) > SUBDIVISION_PRECISION && ++i < SUBDIVISION_MAX_ITERATIONS);
-      return currentT;
-    }
-
-    function getTForX (aX) {
-      var intervalStart = 0.0;
-      var currentSample = 1;
-      var lastSample = kSplineTableSize - 1;
-
-      for (; currentSample != lastSample && mSampleValues[currentSample] <= aX; ++currentSample) {
-        intervalStart += kSampleStepSize;
-      }
-      --currentSample;
-
-      // Interpolate to provide an initial guess for t
-      var dist = (aX - mSampleValues[currentSample]) / (mSampleValues[currentSample+1] - mSampleValues[currentSample]);
-      var guessForT = intervalStart + dist * kSampleStepSize;
-
-      var initialSlope = getSlope(guessForT, mX1, mX2);
-      if (initialSlope >= NEWTON_MIN_SLOPE) {
-        return newtonRaphsonIterate(aX, guessForT);
-      } else if (initialSlope == 0.0) {
-        return guessForT;
-      } else {
-        return binarySubdivide(aX, intervalStart, intervalStart + kSampleStepSize);
-      }
-    }
-
-    if (mX1 != mY1 || mX2 != mY2)
-      calcSampleValues();
-
-    var f = function (aX) {
-      if (mX1 === mY1 && mX2 === mY2) return aX; // linear
-      // Because JavaScript number are imprecise, we should guarantee the extremes are right.
-      if (aX === 0) return 0;
-      if (aX === 1) return 1;
-      return calcBezier(getTForX(aX), mY1, mY2);
-    };
-    var str = "BezierEasing("+[mX1, mY1, mX2, mY2]+")";
-    f.toString = function () { return str; };
-
-    return f;
+  }
+  if (points[0] < 0 || points[0] > 1 || points[2] < 0 || points[2] > 1) {
+    throw new Error("BezierEasing x values must be in [0, 1] range.");
   }
 
-  // CSS mapping
-  BezierEasing.css = {
-    "ease":        BezierEasing(0.25, 0.1, 0.25, 1.0),
-    "linear":      BezierEasing(0.00, 0.0, 1.00, 1.0),
-    "ease-in":     BezierEasing(0.42, 0.0, 1.00, 1.0),
-    "ease-out":    BezierEasing(0.00, 0.0, 0.58, 1.0),
-    "ease-in-out": BezierEasing(0.42, 0.0, 0.58, 1.0)
-  };
+  this._str = "BezierEasing("+points+")";
+  this._css = "cubic-bezier("+points+")";
+  this._p = points;
+  this._mSampleValues = float32ArraySupported ? new Float32Array(kSplineTableSize) : new Array(kSplineTableSize);
+  this._precomputed = false;
+}
 
-  return BezierEasing;
+BezierEasing.prototype = {
 
-}));
+  get: function (x) {
+    var mX1 = this._p[0],
+      mY1 = this._p[1],
+      mX2 = this._p[2],
+      mY2 = this._p[3];
+    if (!this._precomputed) this._precompute();
+    if (mX1 === mY1 && mX2 === mY2) return x; // linear
+    // Because JavaScript number are imprecise, we should guarantee the extremes are right.
+    if (x === 0) return 0;
+    if (x === 1) return 1;
+    return calcBezier(this._getTForX(x), mY1, mY2);
+  },
 
+  getPoints: function() {
+    return this._p;
+  },
+
+  toString: function () {
+    return this._str;
+  },
+
+  toCSS: function () {
+    return this._css;
+  },
+
+  // Private part
+
+  _precompute: function () {
+    var mX1 = this._p[0],
+      mY1 = this._p[1],
+      mX2 = this._p[2],
+      mY2 = this._p[3];
+    this._precomputed = true;
+    if (mX1 !== mY1 || mX2 !== mY2)
+      this._calcSampleValues();
+  },
+
+  _calcSampleValues: function () {
+    var mX1 = this._p[0],
+      mX2 = this._p[2];
+    for (var i = 0; i < kSplineTableSize; ++i) {
+      this._mSampleValues[i] = calcBezier(i * kSampleStepSize, mX1, mX2);
+    }
+  },
+
+  /**
+   * getTForX chose the fastest heuristic to determine the percentage value precisely from a given X projection.
+   */
+  _getTForX: function (aX) {
+    var mX1 = this._p[0],
+      mX2 = this._p[2],
+      mSampleValues = this._mSampleValues;
+
+    var intervalStart = 0.0;
+    var currentSample = 1;
+    var lastSample = kSplineTableSize - 1;
+
+    for (; currentSample !== lastSample && mSampleValues[currentSample] <= aX; ++currentSample) {
+      intervalStart += kSampleStepSize;
+    }
+    --currentSample;
+
+    // Interpolate to provide an initial guess for t
+    var dist = (aX - mSampleValues[currentSample]) / (mSampleValues[currentSample+1] - mSampleValues[currentSample]);
+    var guessForT = intervalStart + dist * kSampleStepSize;
+
+    var initialSlope = getSlope(guessForT, mX1, mX2);
+    if (initialSlope >= NEWTON_MIN_SLOPE) {
+      return newtonRaphsonIterate(aX, guessForT, mX1, mX2);
+    } else if (initialSlope === 0.0) {
+      return guessForT;
+    } else {
+      return binarySubdivide(aX, intervalStart, intervalStart + kSampleStepSize, mX1, mX2);
+    }
+  }
+};
+
+// CSS mapping
+BezierEasing.css = {
+  "ease":        BezierEasing.ease      = BezierEasing(0.25, 0.1, 0.25, 1.0),
+  "linear":      BezierEasing.linear    = BezierEasing(0.00, 0.0, 1.00, 1.0),
+  "ease-in":     BezierEasing.easeIn    = BezierEasing(0.42, 0.0, 1.00, 1.0),
+  "ease-out":    BezierEasing.easeOut   = BezierEasing(0.00, 0.0, 0.58, 1.0),
+  "ease-in-out": BezierEasing.easeInOut = BezierEasing(0.42, 0.0, 0.58, 1.0)
+};
+
+module.exports = BezierEasing;
+
+}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 },{}],2:[function(require,module,exports){
 var BezierEasing = require("../node_modules/bezier-easing")
 var EASINGS = require("./easing")
@@ -149,18 +186,73 @@ var EASINGS = require("./easing")
 module.exports = Animation
 
 function Animation( tween ){
+  // properties
+  this.duration = 0
+  this.loop = 1
+  this.delay = 0
+  this.easing = BezierEasing(0, 0, 1, 1)
+
+  // user land
+  this.context = null
+  this.render = null
+
   if ( tween ) this.tween(tween)
-  this.channels = {}
+
+  // state
+  this.isRunning = false
+  this.finished = true
+
+  // internals
+  this._channels = {}
+
+  var animation = this
+
+  // animation values
+  this._loopCount = animation.loop
+  this._startTime = 0
+
+  this._cycle = function () {
+    animation._animate()
+    animation.trigger("cycle", animation.loop - animation._loopCount)
+  }
+
+  this._animate = function () {
+    animation._startTime = Date.now()
+
+    // animation loop
+    !function looper(){
+      // when the loop count is numeric
+      // the normal run can request one additional frame
+      // before quiting, causing the last step to be called twice
+      if ( animation.finshed ) return
+
+      var p = (Date.now() - animation._startTime) / animation.duration
+
+      // last step
+      if ( p > 1 ) {
+        animation.render.call(animation.context||animation, 1)
+        if ( !--animation._loopCount ) {
+          animation.trigger("end")
+          animation.finshed = true
+        }
+        else {
+          animation._cycle()
+        }
+      }
+      // normal run
+      else if ( animation.isRunning ) {
+        requestAnimationFrame(looper, null)
+        animation.render.call(animation.context||animation, animation.easing(p))
+      }
+      // when .stop() called
+      else {
+        animation.render.call(animation.context||animation, animation.easing(p))
+      }
+    }()
+  }
 }
 
 Animation.prototype = {
-  duration: 0,
-  startTime: 0,
-  loop: false,
-  isRunning: false,
-  delay: 0,
-  context: null,
-  easing: BezierEasing(0, 0, 1, 1),
   ease: function ( mX1, mY1, mX2, mY2 ){
     if ( EASINGS[mX1] ) {
       this.easing = EASINGS[mX1]
@@ -169,14 +261,24 @@ Animation.prototype = {
       this.easing = mX1
     }
     else if ( arguments.length = 4 ) {
-      this.easing = BezierEasing(mX1, mY1, mX2, mY2)
+      var easing = BezierEasing(mX1, mY1, mX2, mY2)
+      this.easing = function (p) {
+        return easing.get(p)
+      }
     }
     return this
   },
   tween: function ( tween ){
     this.duration = tween.duration || this.duration
     this.delay = tween.delay || this.delay
-    if ( tween.loop != undefined ) this.loop = tween.loop
+    if ( tween.loop != undefined ) {
+      if ( typeof tween.loop == "boolean" ) {
+        this.loop = tween.loop ? Infinity : 1
+      }
+      else if (typeof tween.loop == "number") {
+        this.loop = Math.abs(tween.loop)
+      }
+    }
     if ( tween.ease ) {
       if ( EASINGS[tween.ease] ) {
         this.easing = EASINGS[tween.ease]
@@ -184,104 +286,68 @@ Animation.prototype = {
       else if ( typeof tween.ease == "function" ) {
         this.easing = tween.ease
       }
-      else this.ease.apply(this, tween.ease)
+      else {
+        this.ease.apply(this, tween.ease)
+      }
     }
     this.context = tween.context || null
     return this
   },
-  start: function ( render ){
-    var startTime
-      , duration = this.duration
-      , ease = this.easing
-      , animation = this
-      , context = this.context || animation
-      , loop = this.loop
+  start: function (render) {
+    var animation = this
 
-    if ( !duration ) return this
+    animation.render = animation.render || render
 
-    this.isRunning = true
-
-    var ended = false
-
-    // animation logic
-    var startAnimation = function (){
-      startTime = Date.now()
-      // animation loop
-      !function looper(){
-        // when the loop count is numeric
-        // the normal run can request one additional frame
-        // before quiting, causing the last step to be called twice
-        if ( ended ) return
-        var p = (Date.now() - startTime) / duration
-
-        // last step
-        if ( p > 1 ) {
-          render.call(context, 1)
-          if ( !loop ) {
-            animation.trigger("end")
-            ended = true
-          }
-        }
-        // normal run
-        else if ( animation.isRunning ) {
-          requestAnimationFrame(looper, null)
-          render.call(context, ease(p))
-        }
-        // when .stop() called
-        else {
-          render.call(context, ease(p))
-          clearInterval(timerID)
-          animation.trigger("end")
-          ended = true
-        }
-      }()
+    if (!animation.duration || !animation.render || animation.isRunning) {
+      return animation
     }
 
+    animation.isRunning = true
+
+    // continue after a stop() call
+    if (!animation.finished) {
+      animation._animate()
+      return animation
+    }
+
+    // start from a finished state
+    animation._loopCount = animation.loop
+    animation.finished = false
+
     // delay start
-    var timerID
     setTimeout(function (){
       animation.trigger("start")
-      if ( loop ) {
-        startAnimation()
-        animation.trigger("cycle", /*animation, */animation.loop - loop)
-        if ( typeof loop == "boolean" ) {
-          // infinite loop
-          timerID = setInterval(function (){
-            startAnimation()
-            animation.trigger("cycle", /*animation, */animation.loop - loop)
-          }, duration)
-        }
-        else if( typeof loop == "number" ) {
-          // counter loop
-          timerID = setInterval(function (){
-            if ( !--loop ) clearInterval(timerID)
-            else {
-              startAnimation()
-              animation.trigger("cycle", /*animation, */animation.loop - loop)
-            }
-          }, duration)
-        }
+      if ( animation.loop ) {
+        animation._cycle()
       }
       else {
         // no loop
-        startAnimation()
+        animation._animate()
       }
-    }, this.delay)
-    return this
+    }, animation.delay)
+
+    return animation
   },
   stop: function (){
     this.isRunning = false
-    this.startTime = 0
     this.trigger("stop")
     return this
   },
+  end: function () {
+    this.isRunning = false
+    this._startTime = 0
+    this.finished = true
+    this._loopCount = this.loop
+    this.trigger("end")
+    return this
+  },
   listen: function ( channel, callback ){
-    this.channels[channel] = this.channels[channel] || []
-    this.channels[channel].push(callback)
+    this._channels[channel] = this._channels[channel] || []
+    this._channels[channel].push(callback)
     return this
   },
   unlisten: function ( channel, callback ){
-    channel = this.channels[channel]
+    channel = this._channels[channel]
     if ( !channel || !~channel.indexOf(callback) ) return this
     channel.splice(channel.indexOf(callback), 1)
     return this
@@ -294,13 +360,13 @@ Animation.prototype = {
     })
   },
   trigger: function ( channel, msg ){
-    channel = this.channels[channel]
+    channel = this._channels[channel]
     if ( !channel ) return this
     var i = -1
       , l = channel.length
     msg = [].slice.call(arguments, 1)
     while ( ++i < l ) {
-      channel[i].apply(this.context, msg)
+      channel[i].apply(this.context||this, msg)
     }
     return this
   }
@@ -308,6 +374,7 @@ Animation.prototype = {
 
 Animation.prototype.on = Animation.prototype.listen
 Animation.prototype.off = Animation.prototype.removeListener = Animation.prototype.unlisten
+
 },{"../node_modules/bezier-easing":1,"./easing":3}],3:[function(require,module,exports){
 var BezierEasing = require("../node_modules/bezier-easing")
 
@@ -380,16 +447,18 @@ woosh.Animation = Animation
 
 woosh.extend = function ( extension ){
   for ( var method in extension ) {
-    Animation.prototype[method] = extension[method]
+    if (extension.hasOwnProperty(method)) Animation.prototype[method] = extension[method]
   }
 }
+
 woosh.easing = function ( extension ){
   for ( var name in extension ) {
-    EASINGS[name] = extension[name]
+    if (extension.hasOwnProperty(name)) EASINGS[name] = extension[name]
   }
 }
 
 require("./propertyAnimation")(woosh)
+
 }).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 },{"./Animation":2,"./easing":3,"./propertyAnimation":5,"./requestAnimationFrame":6}],5:[function(require,module,exports){
 module.exports = function ( woosh ){
@@ -442,18 +511,14 @@ module.exports = function ( woosh ){
   function increment( animation, subject, property, max, post ){
     var startValue = getValue(subject, property)
       , delta = max - startValue
-    return function ( p ){
+
+    return function render( p ){
       var value = getValue(subject, property)
       if ( value <= max ) {
-//        console.log("startValue %d, max %d, delta %d, p %f, p*delta %f", startValue, max, delta, p, p*delta)
         p = startValue + (p *= delta) >= max ? max : startValue + p
-//        setValue(subject, property, p, post)
-//        return true
         return [subject, property, p, post]
       }
       else if ( animation.loop ) {
-//        setValue(subject, property, startValue, post)
-//        return true
         return [subject, property, startValue, post]
       }
       return false
@@ -463,18 +528,14 @@ module.exports = function ( woosh ){
   function decrement( animation, subject, property, min, post ){
     var startValue = getValue(subject, property)
       , delta = startValue - min
-    return function ( p ){
+    return function render( p ){
       var value = getValue(subject, property)
       if ( value >= min ) {
         p = startValue - delta * p
         p = p <= min ? min : p
-//        setValue(subject, property, p, post)
-//        return true
         return [subject, property, p, post]
       }
       else if ( animation.loop ) {
-//        setValue(subject, property, startValue, post)
-//        return true
         return [subject, property, startValue, post]
       }
       return false
@@ -487,17 +548,25 @@ module.exports = function ( woosh ){
       , valFrom
       , valTo
       , post
+
     for ( var p in to ) {
-      valFrom = getValue(subject, p)
-      valTo = getValue(to, p)
-      post = postfix(subject, p) || postfix(to, p)
-      ++length
-      if ( valFrom < valTo ) values[p] = increment(animation, subject, p, valTo, post)
-      else if ( valFrom > valTo ) values[p] = decrement(animation, subject, p, valTo, post)
-      else --length
+      if (to.hasOwnProperty(p)) {
+        valFrom = getValue(subject, p)
+        valTo = getValue(to, p)
+        post = postfix(subject, p) || postfix(to, p)
+        ++length
+        if ( valFrom < valTo )
+          values[p] = increment(animation, subject, p, valTo, post)
+        else if ( valFrom > valTo )
+          values[p] = decrement(animation, subject, p, valTo, post)
+        else
+          --length
+      }
     }
+
     to = subject = null
-    return function ( p ){
+
+    return function render( p ){
       if ( length ) {
         var setters = []
           , setter

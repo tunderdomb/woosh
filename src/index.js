@@ -13,12 +13,13 @@ woosh.Animation = Animation
 
 woosh.extend = function ( extension ){
   for ( var method in extension ) {
-    Animation.prototype[method] = extension[method]
+    if (extension.hasOwnProperty(method)) Animation.prototype[method] = extension[method]
   }
 }
+
 woosh.easing = function ( extension ){
   for ( var name in extension ) {
-    EASINGS[name] = extension[name]
+    if (extension.hasOwnProperty(name)) EASINGS[name] = extension[name]
   }
 }
 
