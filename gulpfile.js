@@ -6,9 +6,9 @@ var uglify = require('gulp-uglifyjs')
 gulp.task("browserify", function(  ){
   gulp.src(["src/index.js"])
     .pipe(browserify({}))
-    .pipe(concat("woosh.js"))
+    .pipe(concat("dist/woosh.js"))
     .pipe(gulp.dest(process.cwd()))
-    .pipe(uglify("woosh.min.js", {
+    .pipe(uglify("dist/woosh.min.js", {
       comments: true
     }))
     .pipe(gulp.dest(process.cwd()))
