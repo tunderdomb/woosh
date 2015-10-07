@@ -1,6 +1,6 @@
 {
   "name": "woosh-tween",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Tiny tweening library with bezier easings",
   "main": "src/index.js",
   "repository": {

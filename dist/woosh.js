@@ -180,7 +180,7 @@ module.exports = BezierEasing;
 
 }).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 },{}],2:[function(require,module,exports){
-var BezierEasing = require("../node_modules/bezier-easing")
+var BezierEasing = require("bezier-easing")
 var EASINGS = require("./easing")
 
 module.exports = Animation
@@ -375,8 +375,8 @@ Animation.prototype = {
 Animation.prototype.on = Animation.prototype.listen
 Animation.prototype.off = Animation.prototype.removeListener = Animation.prototype.unlisten
 
-},{"../node_modules/bezier-easing":1,"./easing":3}],3:[function(require,module,exports){
-var BezierEasing = require("../node_modules/bezier-easing")
+},{"./easing":3,"bezier-easing":1}],3:[function(require,module,exports){
+var BezierEasing = require("bezier-easing")
 
 module.exports = {
   "ease": BezierEasing(0.25, 0.1, 0.25, 1.0),
@@ -430,7 +430,8 @@ module.exports = {
     }
   }
 }
-},{"../node_modules/bezier-easing":1}],4:[function(require,module,exports){
+
+},{"bezier-easing":1}],4:[function(require,module,exports){
 (function (global){
 require("./requestAnimationFrame")
 

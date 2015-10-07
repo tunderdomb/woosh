@@ -1,4 +1,4 @@
-var BezierEasing = require("../node_modules/bezier-easing")
+var BezierEasing = require("bezier-easing")
 
 module.exports = {
   "ease": BezierEasing(0.25, 0.1, 0.25, 1.0),

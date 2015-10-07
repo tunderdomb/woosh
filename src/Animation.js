@@ -1,4 +1,4 @@
-var BezierEasing = require("../node_modules/bezier-easing")
+var BezierEasing = require("bezier-easing")
 var EASINGS = require("./easing")
 
 module.exports = Animation
